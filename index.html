@@ -1,44 +1,85 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <title>Todo App</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      margin-top: 50px;
+    }
+    .box {
+      background: white;
+      padding: 20px;
+      width: 400px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px #ccc;
+    }
+    input {
+      width: 70%;
+      padding: 10px;
+    }
+    button {
+      padding: 10px;
+      cursor: pointer;
+    }
+    li {
+      margin: 10px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
 <body>
 
-<h2>To-Do List</h2>
+<div class="box">
+  <h2>Todo App</h2>
 
-<input id="task" placeholder="Enter task">
-<button onclick="addTask()">Add</button>
+  <input id="taskInput" placeholder="Enter task">
+  <button onclick="addTask()">Add</button>
 
-<ul id="list"></ul>
+  <ul id="taskList"></ul>
+</div>
 
 <script>
-async function addTask() {
-    const text = document.getElementById('task').value;
+async function loadTasks() {
+  const res = await fetch('/tasks');
+  const tasks = await res.json();
 
-    await fetch('/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ text })
-    });
+  const list = document.getElementById('taskList');
+  list.innerHTML = '';
 
-    loadTasks();
+  tasks.forEach(task => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      ${task.text}
+      <button onclick="deleteTask('${task._id}')">❌</button>
+    `;
+    list.appendChild(li);
+  });
 }
 
-async function loadTasks() {
-    const res = await fetch('/tasks');
-    const tasks = await res.json();
+async function addTask() {
+  const input = document.getElementById('taskInput');
 
-    document.getElementById('list').innerHTML =
-        tasks.map(t =>
-            `<li>${t.text} 
-            <button onclick="deleteTask('${t._id}')">X</button>
-            </li>`
-        ).join('');
+  await fetch('/add', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: input.value })
+  });
+
+  input.value = '';
+  loadTasks();
 }
 
 async function deleteTask(id) {
-    await fetch('/delete/' + id, { method: 'DELETE' });
-    loadTasks();
+  await fetch('/delete/' + id, { method: 'DELETE' });
+  loadTasks();
 }
 
+// Load tasks on start
 loadTasks();
 </script>
 
