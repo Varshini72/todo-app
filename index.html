@@ -1,87 +1,193 @@
-<!DOCTYPE html>
-<html>
-<head>
+<!doctype html>
+<html lang="en" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Todo App</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="/_sdk/data_sdk.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Playfair+Display:wght@600;700&amp;display=swap" rel="stylesheet">
   <style>
-    body {
-      font-family: Arial;
-      background: #f4f4f4;
-      display: flex;
-      justify-content: center;
-      margin-top: 50px;
+    * { box-sizing: border-box; }
+
+    .task-item { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+    .task-item:hover { transform: translateX(4px); }
+
+    .check-circle {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2.5px solid; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.25s ease; flex-shrink: 0;
     }
-    .box {
-      background: white;
-      padding: 20px;
-      width: 400px;
-      border-radius: 10px;
-      box-shadow: 0 0 10px #ccc;
+    .check-circle:hover { transform: scale(1.15); }
+    .check-circle.checked svg { opacity: 1; }
+    .check-circle svg { opacity: 0; transition: opacity 0.2s; }
+
+    .task-text-done { text-decoration: line-through; opacity: 0.5; }
+
+    .add-input:focus { outline: none; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    input {
-      width: 70%;
-      padding: 10px;
+    .animate-in { animation: slideIn 0.35s ease forwards; }
+
+    .delete-btn { opacity: 0; transition: opacity 0.2s; }
+    .task-item:hover .delete-btn { opacity: 1; }
+
+    .filter-btn { transition: all 0.2s ease; }
+    .filter-btn.active { font-weight: 600; }
+
+    .toast-msg {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      padding: 10px 20px; border-radius: 10px; font-size: 14px;
+      z-index: 100; animation: toastIn 0.3s ease, toastOut 0.3s ease 2.2s forwards;
     }
-    button {
-      padding: 10px;
-      cursor: pointer;
-    }
-    li {
-      margin: 10px 0;
-      display: flex;
-      justify-content: space-between;
-    }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(16px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+    @keyframes toastOut { to { opacity: 0; transform: translateX(-50%) translateY(16px); } }
+
+    .inline-confirm { animation: slideIn 0.2s ease; }
   </style>
-</head>
-<body>
+  <style>body { box-sizing: border-box; }</style>
+ </head>
+ <body class="h-full" style="font-family: 'DM Sans', sans-serif; margin: 0;">
+  <div id="app-wrapper" class="h-full w-full overflow-auto" style="background: #1a1a2e;">
+   <div class="max-w-lg mx-auto px-5 py-10"><!-- Header -->
+    <div class="mb-8">
+     <h1 id="app-title" style="font-family: 'Playfair Display', serif; color: #f0e6d3; font-size: 36px; margin: 0 0 4px;">My Tasks</h1>
+     <p id="task-count" style="color: #7a7a9e; font-size: 14px; margin: 0;">0 tasks</p>
+    </div><!-- Add Task -->
+    <div class="flex gap-3 mb-6">
+     <div class="flex-1 relative" style="background: #252547; border-radius: 14px; border: 1.5px solid #35356a;"><input id="task-input" type="text" placeholder="What needs to be done?" class="add-input w-full px-4 py-3" style="background: transparent; color: #f0e6d3; font-size: 15px; border: none; font-family: 'DM Sans', sans-serif;">
+     </div><button id="add-btn" onclick="addTask()" style="background: #e07a5f; border: none; border-radius: 14px; width: 48px; height: 48px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s;" onmouseenter="this.style.background='#c96a52'" onmouseleave="this.style.background='#e07a5f'"> <i data-lucide="plus" style="color: #1a1a2e; width: 22px; height: 22px;"></i> </button>
+    </div><!-- Filters -->
+    <div class="flex gap-1 mb-5" style="background: #252547; border-radius: 10px; padding: 4px;"><button class="filter-btn active flex-1 py-2 text-center" data-filter="all" onclick="setFilter('all')" style="border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; background: #35356a; color: #f0e6d3;">All</button> <button class="filter-btn flex-1 py-2 text-center" data-filter="active" onclick="setFilter('active')" style="border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; background: transparent; color: #7a7a9e;">Active</button> <button class="filter-btn flex-1 py-2 text-center" data-filter="done" onclick="setFilter('done')" style="border: none; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: 'DM Sans', sans-serif; background: transparent; color: #7a7a9e;">Done</button>
+    </div><!-- Task List -->
+    <div id="task-list"></div><!-- Empty State -->
+    <div id="empty-state" class="text-center py-12" style="display: none;">
+     <div style="font-size: 48px; margin-bottom: 12px;">
+      ✨
+     </div>
+     <p id="empty-msg" style="color: #7a7a9e; font-size: 15px; margin: 0;">No tasks yet. Add one above!</p>
+    </div>
+   </div>
+  </div>
+  <script>
+let allTasks = JSON.parse(localStorage.getItem("tasks")) || [];
+let currentFilter = 'all';
+let pendingDelete = null;
 
-<div class="box">
-  <h2>Todo App</h2>
+function saveTasks() {
+  localStorage.setItem("tasks", JSON.stringify(allTasks));
+}
 
-  <input id="taskInput" placeholder="Enter task">
-  <button onclick="addTask()">Add</button>
+function renderTasks() {
+  const list = document.getElementById('task-list');
 
-  <ul id="taskList"></ul>
-</div>
+  let filtered = allTasks;
+  if (currentFilter === 'active') filtered = allTasks.filter(t => !t.completed);
+  if (currentFilter === 'done') filtered = allTasks.filter(t => t.completed);
 
-<script>
-async function loadTasks() {
-  const res = await fetch('/tasks');
-  const tasks = await res.json();
+  const activeCount = allTasks.filter(t => !t.completed).length;
+  const total = allTasks.length;
 
-  const list = document.getElementById('taskList');
-  list.innerHTML = '';
+  document.getElementById('task-count').textContent =
+    `${total} tasks · ${activeCount} active`;
 
-  tasks.forEach(task => {
-    const li = document.createElement('li');
-    li.innerHTML = `
-      ${task.text}
-      <button onclick="deleteTask('${task._id}')">❌</button>
-    `;
-    list.appendChild(li);
+  document.getElementById('empty-state').style.display =
+    filtered.length === 0 ? '' : 'none';
+
+  list.innerHTML = "";
+
+  filtered.forEach(task => {
+    const el = document.createElement('div');
+    el.className = 'task-item';
+
+    if (pendingDelete === task.id) {
+      el.innerHTML = `
+        <span style="flex:1;color:#fff;">Delete this task?</span>
+        <button onclick="confirmDelete('${task.id}')">Yes</button>
+        <button onclick="cancelDelete()">No</button>
+      `;
+    } else {
+      el.innerHTML = `
+        <div class="check-circle ${task.completed ? 'checked' : ''}"
+          onclick="toggleTask('${task.id}')"
+          style="border-color:${task.completed ? '#e07a5f' : '#aaa'};
+          background:${task.completed ? '#e07a5f' : 'transparent'}">
+        </div>
+
+        <span class="${task.completed ? 'task-text-done' : ''}"
+          style="flex:1;color:#fff;">
+          ${task.text}
+        </span>
+
+        <button onclick="requestDelete('${task.id}')">🗑</button>
+      `;
+    }
+
+    list.appendChild(el);
   });
 }
 
-async function addTask() {
-  const input = document.getElementById('taskInput');
+function addTask() {
+  const input = document.getElementById('task-input');
+  const text = input.value.trim();
+  if (!text) return;
 
-  await fetch('/add', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: input.value })
+  const newTask = {
+    id: Date.now().toString(),
+    text,
+    completed: false
+  };
+
+  allTasks.push(newTask);
+  saveTasks();
+  input.value = "";
+  renderTasks();
+}
+
+function toggleTask(id) {
+  const task = allTasks.find(t => t.id === id);
+  task.completed = !task.completed;
+  saveTasks();
+  renderTasks();
+}
+
+function requestDelete(id) {
+  pendingDelete = id;
+  renderTasks();
+}
+
+function cancelDelete() {
+  pendingDelete = null;
+  renderTasks();
+}
+
+function confirmDelete(id) {
+  allTasks = allTasks.filter(t => t.id !== id);
+  pendingDelete = null;
+  saveTasks();
+  renderTasks();
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === f);
+  });
+  renderTasks();
+}
+
+document.getElementById('task-input')
+  .addEventListener('keydown', e => {
+    if (e.key === 'Enter') addTask();
   });
 
-  input.value = '';
-  loadTasks();
-}
-
-async function deleteTask(id) {
-  await fetch('/delete/' + id, { method: 'DELETE' });
-  loadTasks();
-}
-
-// Load tasks on start
-loadTasks();
+renderTasks();
 </script>
-
-</body>
+ </body>
 </html>
